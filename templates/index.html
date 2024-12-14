@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Football Scores</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        h1, h2 { text-align: center; }
+        #todays-matches { list-style-type: none; padding: 0; }
+        #todays-matches li { background: #f0f0f0; margin: 10px 0; padding: 10px; border-radius: 5px; cursor: pointer; }
+        #todays-matches li:hover { background: #e0e0e0; }
+        .match-time { font-size: 0.9em; color: #666; }
+        .match-score { font-weight: bold; }
+        .error-message { color: red; text-align: center; }
+        #comparison-view { display: none; background: #f9f9f9; padding: 20px; border-radius: 5px; margin-top: 20px; }
+        .team-comparison { display: flex; justify-content: space-between; }
+        .team-stats { width: 45%; }
+        .pitch { 
+            width: 300px; 
+            height: 400px; /* Increased height for better visualization */
+            background-color: #4CAF50; 
+            margin: 20px auto; 
+            position: relative; 
+            border: 2px solid white;
+        }
+        .center-circle {
+            width: 50px;
+            height: 50px;
+            border: 2px solid white;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .penalty-area {
+            width: 60px;
+            height: 120px;
+            border: 2px solid white;
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .penalty-area-left { left: 0; }
+        .penalty-area-right { right: 0; }
+        .goal {
+            width: 10px;
+            height: 40px;
+            background-color: white;
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .goal-left { left: 0; }
+        .goal-right { right: 0; }
+        .player {
+            width: 20px;
+            height: 20px;
+            background-color: red;
+            border-radius: 50%;
+            position: absolute;
+            transform: translate(-50%, -50%);
+        }
+        .player.away {
+            background-color: blue;
+        }
+    </style>
+</head>
+<body>
+    <h1>Football Scores</h1>
+
+    <h2>Today's Matches</h2>
+    <ul id="todays-matches"></ul>
+
+    <div id="comparison-view">
+        <h2>Match Comparison</h2>
+        <div class="team-comparison">
+            <div class="team-stats" id="home-team-stats"></div>
+            <div class="team-stats" id="away-team-stats"></div>
+        </div>
+        <div class="pitch" id="pitch">
+            <div class="center-circle"></div>
+            <div class="penalty-area penalty-area-left"></div>
+            <div class="penalty-area penalty-area-right"></div>
+            <div class="goal goal-left"></div>
+            <div class="goal goal-right"></div>
+        </div>
+        <div>
+            <label for="formation-select">Select Formation: </label>
+            <select id="formation-select">
+                <option value="442">4-4-2</option>
+                <option value="433">4-3-3</option>
+                <option value="352">3-5-2</option>
+                <option value="3421">3-4-2-1</option>
+            </select>
+        </div>
+    </div>
+
+    <script>
+        const todaysMatchesList = document.getElementById('todays-matches');
+        const comparisonView = document.getElementById('comparison-view');
+        const homeTeamStats = document.getElementById('home-team-stats');
+        const awayTeamStats = document.getElementById('away-team-stats');
+
+        function displayError(element, message) {
+            element.innerHTML = `<li class="error-message">${message}</li>`;
+        }
+
+        // Load today's matches
+        fetch('/api/todays_matches')
+            .then(response => response.json())
+            .then(data => {
+                if (data.matches && data.matches.length > 0) {
+                    data.matches.forEach(match => {
+                        const li = document.createElement('li');
+                        const matchTime = new Date(match.utcDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        li.innerHTML = `
+                            <span class="match-time">${matchTime}</span>
+                            <span class="match-teams">${match.homeTeam.name} vs ${match.awayTeam.name}</span>
+                            <span class="match-score">${match.score.fullTime.homeTeam} - ${match.score.fullTime.awayTeam}</span>
+                            <span class="match-status">(${match.status})</span>
+                        `;
+                        li.onclick = () => showComparison(match);
+                        todaysMatchesList.appendChild(li);
+                    });
+                } else {
+                    displayError(todaysMatchesList, "No matches available for today.");
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                displayError(todaysMatchesList, "Error loading today's matches.");
+            });
+
+        function showComparison(match) {
+            comparisonView.style.display = 'block';
+
+            // Simulate fetching additional data for teams
+            const homeTeamData = simulateTeamData(match.homeTeam.name);
+            const awayTeamData = simulateTeamData(match.awayTeam.name);
+
+
+            homeTeamStats.innerHTML = `
+                <h3>${match.homeTeam.name}</h3>
+                <p>Form: ${homeTeamData.form}</p>
+                <p>Top Scorer: ${homeTeamData.topScorer}</p>
+                <p>League Position: ${homeTeamData.leaguePosition}</p>
+            `;
+
+            awayTeamStats.innerHTML = `
+                <h3>${match.awayTeam.name}</h3>
+                <p>Form: ${awayTeamData.form}</p>
+                <p>Top Scorer: ${awayTeamData.topScorer}</p>
+                <p>League Position: ${awayTeamData.leaguePosition}</p>
+            `;
+
+            // Set up formation display
+            const formationSelect = document.getElementById('formation-select');
+            formationSelect.onchange = () => updateFormation(formationSelect.value);
+            updateFormation(formationSelect.value);
+        }
+
+        function simulateTeamData(teamName) {
+            // This function simulates fetching additional data for a team
+            return {
+                form: ['W', 'L', 'D', 'W', 'W'].join(' '),
+                topScorer: `${teamName.split(' ')[0]} Star`,
+                leaguePosition: Math.floor(Math.random() * 20) + 1
+            };
+        }
+
+        function updateFormation(formation) {
+            const pitch = document.getElementById('pitch');
+            pitch.innerHTML = ''; // Clear existing players
+
+            const homePositions = getPositions(formation);
+            const awayPositions = getPositions(formation).map(pos => ({ x: 100 - pos.x, y: 100 - pos.y }));
+
+            homePositions.forEach((pos, index) => {
+                addPlayer(pitch, pos.x, pos.y, index + 1, 'home');
+            });
+
+            awayPositions.forEach((pos, index) => {
+                addPlayer(pitch, pos.x, pos.y, index + 1, 'away');
+            });
+        }
+
+        function addPlayer(pitch, x, y, number, team) {
+            const player = document.createElement('div');
+            player.className = `player ${team}`;
+            player.style.left = `${x}%`;
+            player.style.top = `${y}%`;
+            player.textContent = number;
+            pitch.appendChild(player);
+        }
+
+        function getPositions(formation) {
+            const formations = {
+                '442': [
+                    {x: 50, y: 90}, // GK
+                    {x: 15, y: 70}, {x: 35, y: 70}, {x: 65, y: 70}, {x: 85, y: 70}, // Defenders
+                    {x: 20, y: 40}, {x: 40, y: 40}, {x: 60, y: 40}, {x: 80, y: 40}, // Midfielders
+                    {x: 35, y: 20}, {x: 65, y: 20} // Forwards
+                ],
+                '433': [
+                    {x: 50, y: 90},
+                    {x: 15, y: 70}, {x: 35, y: 70}, {x: 65, y: 70}, {x: 85, y: 70},
+                    {x: 30, y: 40}, {x: 50, y: 40}, {x: 70, y: 40},
+                    {x: 20, y: 20}, {x: 50, y: 20}, {x: 80, y: 20}
+                ],
+                '352': [
+                    {x: 50, y: 90},
+                    {x: 20, y: 70}, {x: 50, y: 70}, {x: 80, y: 70},
+                    {x: 10, y: 40}, {x: 30, y: 40}, {x: 50, y: 40}, {x: 70, y: 40}, {x: 90, y: 40},
+                    {x: 35, y: 20}, {x: 65, y: 20}
+                ],
+                '3421': [
+                    {x: 50, y: 90},
+                    {x: 20, y: 70}, {x: 50, y: 70}, {x: 80, y: 70},
+                    {x: 15, y: 40}, {x: 35, y: 40}, {x: 65, y: 40}, {x: 85, y: 40},
+                    {x: 30, y: 20}, {x: 70, y: 20},
+                    {x: 50, y: 10}
+                ]
+            };
+            return formations[formation] || formations['442'];
+        }
+    </script>
+</body>
+</html>
